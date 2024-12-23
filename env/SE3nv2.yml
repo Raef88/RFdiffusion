@@ -1,17 +1,15 @@
-name: SE3nv
+name: SE3nv2
 channels:
   - defaults
   - conda-forge
   - pytorch
   - dglteam
-  - nvidia
 dependencies:
-  - python=3.9
-  - pytorch=1.9
+  - python>=3.9
+  - pytorch>=1.9
   - torchaudio
   - torchvision
-  - cudatoolkit=11.1
-  - dgl-cuda11.1
+  - dgl
   - pip
   - pip:
     - hydra-core
