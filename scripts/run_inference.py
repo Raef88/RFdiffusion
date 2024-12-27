@@ -42,13 +42,9 @@ def main(conf: HydraConfig) -> None:
         make_deterministic()
 
     # Check for available GPU and print result of check
-    if torch.cuda.is_available():
-        device_name = torch.cuda.get_device_name(torch.cuda.current_device())
-        log.info(f"Found GPU with device_name {device_name}. Will run RFdiffusion on {device_name}")
-    else:
-        log.info("////////////////////////////////////////////////")
-        log.info("///// NO GPU DETECTED! Falling back to CPU /////")
-        log.info("////////////////////////////////////////////////")
+    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
+    device_name = "MPS" if device.type == "mps" else "CPU"
+    log.info(f"Using device: {device_name}")
 
     # Initialize sampler and target/contig.
     sampler = iu.sampler_selector(conf)
@@ -87,8 +83,9 @@ def main(conf: HydraConfig) -> None:
         seq_stack = []
         plddt_stack = []
 
-        x_t = torch.clone(x_init)
-        seq_t = torch.clone(seq_init)
+        x_t = x_init.to(device)
+        seq_t = seq_init.to(device)
+        
         # Loop over number of reverse diffusion time steps.
         for t in range(int(sampler.t_step_input), sampler.inf_conf.final_step - 1, -1):
             px0, x_t, seq_t, plddt = sampler.sample_step(
