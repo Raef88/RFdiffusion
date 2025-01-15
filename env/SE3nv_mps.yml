@@ -3,13 +3,11 @@ channels:
   - defaults
   - conda-forge
   - pytorch
-  - dglteam
 dependencies:
   - python>=3.9
   - pytorch>=1.9, <2.0
   - torchaudio
   - torchvision
-  - dgl
   - pip
   - pip:
     - hydra-core
