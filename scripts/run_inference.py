@@ -144,8 +144,8 @@ def main(conf: HydraConfig) -> None:
         trb = dict(
             config=OmegaConf.to_container(sampler._conf, resolve=True),
             plddt=plddt_stack.cpu().numpy(),
-            device=torch.cuda.get_device_name(torch.cuda.current_device())
-            if torch.cuda.is_available()
+            device=torch.mps.get_device_name(torch.mps.current_device())
+            if torch.mps.is_available()
             else "CPU",
             time=time.time() - start_time,
         )
