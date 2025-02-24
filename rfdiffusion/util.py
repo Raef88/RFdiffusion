@@ -2,14 +2,14 @@ import scipy.sparse
 from rfdiffusion.chemical import *
 from rfdiffusion.scoring import *
 
-
+    
 def generate_Cbeta(N, Ca, C):
     # recreate Cb given N,Ca,C
-    b = Ca - N
-    c = C - Ca
-    a = torch.cross(b, c, dim=-1)
+    b = (Ca - N).to(N.device)
+    c = (C - Ca).to(N.device)
+    a = torch.cross(b, c, dim=-1).to(N.device)
     # These are the values used during training
-    Cb = -0.58273431*a + 0.56802827*b - 0.54067466*c + Ca
+    Cb = (-0.58273431*a + 0.56802827*b - 0.54067466*c + Ca).to(N.device)
     # fd: below matches sidechain generator (=Rosetta params)
     # Cb = -0.57910144 * a + 0.5689693 * b - 0.5441217 * c + Ca
 
@@ -133,9 +133,10 @@ def get_tor_mask(seq, torsion_indices, mask_in=None):
 def get_torsions(
     xyz_in, seq, torsion_indices, torsion_can_flip, ref_angles, mask_in=None
 ):
+    device = xyz_in.device
     B, L = xyz_in.shape[:2]
 
-    tors_mask = get_tor_mask(seq, torsion_indices, mask_in)
+    tors_mask = get_tor_mask(seq, torsion_indices, mask_in).to(device)
 
     # torsions to restrain to 0 or 180degree
     tors_planar = torch.zeros((B, L, 10), dtype=torch.bool, device=xyz_in.device)
@@ -144,8 +145,8 @@ def get_torsions(
     # idealize given xyz coordinates before computing torsion angles
     xyz = xyz_in.clone()
     Rs, Ts = rigid_from_3_points(xyz[..., 0, :], xyz[..., 1, :], xyz[..., 2, :])
-    Nideal = torch.tensor([-0.5272, 1.3593, 0.000], device=xyz_in.device)
-    Cideal = torch.tensor([1.5233, 0.000, 0.000], device=xyz_in.device)
+    Nideal = torch.tensor([-0.5272, 1.3593, 0.000], device=xyz.device)
+    Cideal = torch.tensor([1.5233, 0.000, 0.000], device=xyz.device)
     xyz[..., 0, :] = torch.einsum("brij,j->bri", Rs, Nideal) + Ts
     xyz[..., 2, :] = torch.einsum("brij,j->bri", Rs, Cideal) + Ts
 
@@ -168,22 +169,30 @@ def get_torsions(
     )
 
     # chis
-    ti0 = torch.gather(xyz, 2, torsion_indices[seq, :, 0, None].repeat(1, 1, 1, 3))
-    ti1 = torch.gather(xyz, 2, torsion_indices[seq, :, 1, None].repeat(1, 1, 1, 3))
-    ti2 = torch.gather(xyz, 2, torsion_indices[seq, :, 2, None].repeat(1, 1, 1, 3))
-    ti3 = torch.gather(xyz, 2, torsion_indices[seq, :, 3, None].repeat(1, 1, 1, 3))
+    torsion_indices = torsion_indices.to(device)
+    ti0 = torch.gather(xyz, 2, torsion_indices[seq, :, 0, None].repeat(1, 1, 1, 3).to(device))
+    ti1 = torch.gather(xyz, 2, torsion_indices[seq, :, 1, None].repeat(1, 1, 1, 3).to(device))
+    ti2 = torch.gather(xyz, 2, torsion_indices[seq, :, 2, None].repeat(1, 1, 1, 3).to(device))
+    ti3 = torch.gather(xyz, 2, torsion_indices[seq, :, 3, None].repeat(1, 1, 1, 3).to(device))
     torsions[:, :, 3:7, :] = th_dih(ti0, ti1, ti2, ti3)
 
+    # alt chis
+    torsions_alt = (torsions.clone()).to(device)
+    torsions_alt[torsion_can_flip[seq, :]] *= -1
+
+
     # CB bend
-    NC = 0.5 * (xyz[:, :, 0, :3] + xyz[:, :, 2, :3])
-    CA = xyz[:, :, 1, :3]
-    CB = xyz[:, :, 4, :3]
-    t = th_ang_v(CB - CA, NC - CA)
-    t0 = ref_angles[seq][..., 0, :]
+    NC = (0.5 * (xyz[:, :, 0, :3] + xyz[:, :, 2, :3])).to(device)
+    CA = (xyz[:, :, 1, :3]).to(device)
+    CB = (xyz[:, :, 4, :3]).to(device)
+    t = (th_ang_v(CB - CA, NC - CA)).to(device)
+    t0 = (ref_angles[seq][..., 0, :]).to(device)
     torsions[:, :, 7, :] = torch.stack(
         (torch.sum(t * t0, dim=-1), t[..., 0] * t0[..., 1] - t[..., 1] * t0[..., 0]),
         dim=-1,
     )
+
+    return torsions, torsions_alt, tors_mask, tors_planar
 
     # CB twist
     NCCA = NC - CA
@@ -215,12 +224,6 @@ def get_torsions(
     torsions[mask0[:, 0], mask0[:, 1], mask0[:, 2], 0] = 1.0
     torsions[mask1[:, 0], mask1[:, 1], mask1[:, 2], 1] = 0.0
 
-    # alt chis
-    torsions_alt = torsions.clone()
-    torsions_alt[torsion_can_flip[seq, :]] *= -1
-
-    return torsions, torsions_alt, tors_mask, tors_planar
-
 
 def get_tips(xyz, seq):
     B, L = xyz.shape[:2]
@@ -241,7 +244,7 @@ def get_tips(xyz, seq):
         a = torch.cross(b, c, dim=-1)
         Cb = -0.58273431 * a + 0.56802827 * b - 0.54067466 * c + Ca
 
-        xyz_tips = torch.where(torch.isnan(xyz_tips), Cb, xyz_tips)
+        xyz_tips = torch.where(torch.isnan(xyz_tips), Cb.to(xyz_tips.device), xyz_tips)
     return xyz_tips, mask
 
 
@@ -415,7 +418,9 @@ def writepdb(
 
 
 # resolve tip atom indices
+device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
 tip_indices = torch.full((22,), 0)
+tip_indices = tip_indices.to(device)
 for i in range(22):
     tip_atm = aa2tip[i]
     atm_long = aa2long[i]
@@ -423,6 +428,7 @@ for i in range(22):
 
 # resolve torsion indices
 torsion_indices = torch.full((22, 4, 4), 0)
+torsion_indices = torsion_indices.to(device)
 torsion_can_flip = torch.full((22, 10), False, dtype=torch.bool)
 for i in range(22):
     i_l, i_a = aa2long[i], aa2longalt[i]
@@ -733,7 +739,8 @@ def calc_rmsd(xyz1, xyz2, eps=1e-6):
     d[:,-1] = np.sign(np.linalg.det(V)*np.linalg.det(W))
 
     # Rotation matrix U
-    U = (d*V) @ W
+    U = np.dot(V, W)
+    U = torch.tensor(U, device=device)
 
     # Rotate xyz2
     xyz2_ = xyz2 @ U
