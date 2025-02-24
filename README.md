@@ -1,4 +1,4 @@
-# RF*diffusion*
+# RF*diffusion* (Adapted to MacOS silicon GPUs)
 
 <!--
 <img width="1115" alt="Screen Shot 2023-01-19 at 5 56 33 PM" src="https://user-images.githubusercontent.com/56419265/213588200-f8f44dba-276e-4dd2-b844-15acc441458d.png">
@@ -57,7 +57,7 @@ Thanks to Sergey Ovchinnikov, RFdiffusion is available as a [Google Colab Notebo
 
 We strongly recommend reading this README carefully before getting started with RFdiffusion, and working through some of the examples in the Colab Notebook.
 
-If you want to set up RFdiffusion locally, follow the steps below:
+If you want to set up RFdiffusion locally on a new Mac with an M chip, follow the steps below. This version of RFdiffusion is adapted to use the GPUs of the MacOS silicon M4 Pro chip. The Apple Silicon GPUs use the Metal API for hardware acceleration instead of CUDA. PyTorch supports Metal via the mps (Metal Performance Shaders) backend. However, DGL does not yet support Metal API.
 
 To get started using RFdiffusion, clone the repo:
 ```
