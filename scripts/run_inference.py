@@ -42,7 +42,7 @@ def main(conf: HydraConfig) -> None:
         make_deterministic()
 
     # Check for available GPU and print result of check
-    device = torch.device("mps") if torch.backends.mps.is_available() else torch.device("cpu")
+    device = torch.device("mps" if torch.backends.mps.is_available() else "cpu")
     device_name = "MPS" if device.type == "mps" else "CPU"
     log.info(f"Using device: {device_name}")
 
@@ -83,8 +83,8 @@ def main(conf: HydraConfig) -> None:
         seq_stack = []
         plddt_stack = []
 
-        x_t = x_init.to(device)
-        seq_t = seq_init.to(device)
+        x_t = torch.clone(x_init).to(device)
+        seq_t = torch.clone(seq_init).to(device)
         
         # Loop over number of reverse diffusion time steps.
         for t in range(int(sampler.t_step_input), sampler.inf_conf.final_step - 1, -1):
@@ -97,14 +97,14 @@ def main(conf: HydraConfig) -> None:
             plddt_stack.append(plddt[0])  # remove singleton leading dimension
 
         # Flip order for better visualization in pymol
-        denoised_xyz_stack = torch.stack(denoised_xyz_stack)
+        denoised_xyz_stack = torch.stack([x.to(device) for x in denoised_xyz_stack])
         denoised_xyz_stack = torch.flip(
             denoised_xyz_stack,
             [
                 0,
             ],
         )
-        px0_xyz_stack = torch.stack(px0_xyz_stack)
+        px0_xyz_stack = torch.stack([x.to(device) for x in px0_xyz_stack])
         px0_xyz_stack = torch.flip(
             px0_xyz_stack,
             [
@@ -124,7 +124,7 @@ def main(conf: HydraConfig) -> None:
             torch.argmax(seq_init, dim=-1) == 21, 7, torch.argmax(seq_init, dim=-1)
         )  # 7 is glycine
 
-        bfacts = torch.ones_like(final_seq.squeeze())
+        bfacts = torch.ones_like(final_seq.squeeze()).to(device)
         # make bfact=0 for diffused coordinates
         bfacts[torch.where(torch.argmax(seq_init, dim=-1) == 21, True, False)] = 0
         # pX0 last step
@@ -144,9 +144,7 @@ def main(conf: HydraConfig) -> None:
         trb = dict(
             config=OmegaConf.to_container(sampler._conf, resolve=True),
             plddt=plddt_stack.cpu().numpy(),
-            device=torch.mps.get_device_name(torch.mps.current_device())
-            if torch.mps.is_available()
-            else "CPU",
+            device=torch.device("mps" if torch.backends.mps.is_available() else "cpu"),
             time=time.time() - start_time,
         )
         if hasattr(sampler, "contig_map"):
