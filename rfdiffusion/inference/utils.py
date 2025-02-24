@@ -54,8 +54,8 @@ def get_next_frames(xt, px0, t, diffuser, so3_type, diffusion_mask, noise_scale=
     R_t, Ca_t = rigid_from_3_points(N_t, Ca_t, C_t)
 
     # this must be to normalize them or something
-    R_0 = scipy_R.from_matrix(R_0.squeeze().numpy()).as_matrix()
-    R_t = scipy_R.from_matrix(R_t.squeeze().numpy()).as_matrix()
+    R_0 = scipy_R.from_matrix(R_0.squeeze().cpu().numpy()).as_matrix()
+    R_t = scipy_R.from_matrix(R_t.squeeze().cpu().numpy()).as_matrix()
 
     L = R_t.shape[0]
     all_rot_transitions = np.broadcast_to(np.identity(3), (L, 3, 3)).copy()
@@ -82,9 +82,9 @@ def get_next_frames(xt, px0, t, diffuser, so3_type, diffusion_mask, noise_scale=
         np.einsum(
             "lrij,laj->lrai",
             all_rot_transitions,
-            xt[:, :3, :] - Ca_t.squeeze()[:, None, ...].numpy(),
+            xt[:, :3, :] - Ca_t.squeeze()[:, None, ...].cpu().numpy(),
         )
-        + Ca_t.squeeze()[:, None, None, ...].numpy()
+        + Ca_t.squeeze()[:, None, None, ...].cpu().numpy()
     )
 
     # (L,3,3) set of backbone coordinates with slight rotation
@@ -164,7 +164,16 @@ def get_next_ca(
         xt, px0, t, beta_schedule=beta_schedule, alphabar_schedule=alphabar_schedule
     )
 
-    sampled_crds = torch.normal(mu, torch.sqrt(sigma * noise_scale))
+    std = torch.sqrt(sigma * noise_scale)
+    if std.shape != mu.shape:
+        std = std.expand_as(mu)
+
+    device = mu.device
+
+    mu = mu.to(device)
+    std = std.to(device)
+    
+    sampled_crds = torch.normal(mu, std)
     delta = sampled_crds - xt[:, 1, :]  # check sign of this is correct
 
     if not diffusion_mask is None:
@@ -485,10 +494,14 @@ class Denoise:
             xt.clone(), diffusion_mask=diffusion_mask
         )
 
+        device = ca_deltas.device
+
+        grad_ca = grad_ca.to(device)
+
         ca_deltas += self.potential_manager.get_guide_scale(t) * grad_ca
 
         # add the delta to the new frames
-        frames_next = torch.from_numpy(frames_next) + ca_deltas[:, None, :]  # translate
+        frames_next = torch.from_numpy(frames_next).to(torch.float32).to(device) + ca_deltas[:, None, :]  # translate
 
         fullatom_next = torch.full_like(xt, float("nan")).unsqueeze(0)
         fullatom_next[:, :, :3] = frames_next[None]
