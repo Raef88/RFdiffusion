@@ -47,8 +47,8 @@ class Sampler:
 
         """
         self._log = logging.getLogger(__name__)
-        if torch.cuda.is_available():
-            self.device = torch.device('cuda')
+        if torch.backends.mps.is_available():
+            self.device = torch.device('mps')
         else:
             self.device = torch.device('cpu')
         needs_model_reload = not self.initialized or conf.inference.ckpt_override_path != self._conf.inference.ckpt_override_path
@@ -487,7 +487,7 @@ class Sampler:
             xyz_t[~self.mask_str.squeeze(),3:,:] = float('nan')
 
         xyz_t=xyz_t[None, None]
-        xyz_t = torch.cat((xyz_t, torch.full((1,1,L,13,3), float('nan'))), dim=3)
+        xyz_t = torch.cat((xyz_t, torch.full((1,1,L,13,3), float('nan'), device=xyz_t.device)), dim=3)
 
         ###########
         ### t2d ###
@@ -503,7 +503,7 @@ class Sampler:
         ### alpha_t ###
         ###############
         seq_tmp = t1d[...,:-1].argmax(dim=-1).reshape(-1,L)
-        alpha, _, alpha_mask, _ = util.get_torsions(xyz_t.reshape(-1, L, 27, 3), seq_tmp, TOR_INDICES, TOR_CAN_FLIP, REF_ANGLES)
+        alpha, alpha_alt, alpha_mask, alpha_planar = util.get_torsions(xyz_t.reshape(-1, L, 27, 3), seq_tmp, TOR_INDICES, TOR_CAN_FLIP, REF_ANGLES)
         alpha_mask = torch.logical_and(alpha_mask, ~torch.isnan(alpha[...,0]))
         alpha[torch.isnan(alpha)] = 0.0
         alpha = alpha.reshape(1,-1,L,10,2)
