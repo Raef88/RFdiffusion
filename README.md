@@ -84,14 +84,12 @@ wget http://files.ipd.uw.edu/pub/RFdiffusion/1befcb9b28e2f778f53d47f18b7597fa/RF
 ```
 
 ### Conda Install SE3-Transformer
-
+```
 conda env create -f env/SE3nv_mps.yml
-
 conda activate SE3nv_mps
-
 conda install 'pytorch==2.3.0' torchvision torchaudio
 pip install 'dgl==2.2.1' -f https://data.dgl.ai/wheels/repo.html
-
+```
 # install NVTX C headers, then real NVTX Python-binding
 pip install git+https://github.com/YaoYinYing/nvtx-mock --force-reinstall
 pip install nvtx
