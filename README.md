@@ -57,7 +57,7 @@ Thanks to Sergey Ovchinnikov, RFdiffusion is available as a [Google Colab Notebo
 
 We strongly recommend reading this README carefully before getting started with RFdiffusion, and working through some of the examples in the Colab Notebook.
 
-If you want to set up RFdiffusion locally on a new Mac with an M chip, follow the steps below. With ChatGPT assist, this version of RFdiffusion is adapted to use the GPUs of the MacOS silicon M4 Pro chip. The Apple Silicon GPUs use the Metal API for hardware acceleration instead of CUDA. PyTorch supports Metal via the mps (Metal Performance Shaders) backend. However, DGL does not yet support Metal API, so the scripts are modified to move tensors to CPU before converting to DGL. Thanks to https://github.com/YaoYinYing/RFdiffusion for the SE3Transformer. It was tested by the basic execution to design unconditional monomer and it was 4x faster than Intel CPU to make 10 designs.
+If you want to install RFdiffusion locally on a new Mac with an M chip, follow the steps below. With ChatGPT assist, this version of RFdiffusion is adapted to use the GPUs of the MacOS silicon M4 Pro chip. The Apple Silicon GPUs use the Metal API for hardware acceleration instead of CUDA. PyTorch supports Metal via the mps (Metal Performance Shaders) backend. However, DGL does not yet support Metal API, so the scripts are modified to move tensors to the CPU before converting to DGL. Thanks to https://github.com/YaoYinYing/RFdiffusion for the SE3Transformer without Cuda. The basic execution tested it to design unconditional monomer and it was 2x faster than MacOS CPU and 4x faster than Intel CPU to make 10 designs.
 
 To get started using RFdiffusion, clone the repo:
 ```
